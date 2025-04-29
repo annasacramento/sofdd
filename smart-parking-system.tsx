@@ -327,11 +327,17 @@ export default function SmartParkingSystem() {
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           })
+          console.log("Location permission granted:", position.coords)
         },
         (error) => {
           // Permission denied
           setLocationPermissionGranted(false)
           console.error("Location permission denied:", error)
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0,
         },
       )
     } else {
@@ -2082,7 +2088,8 @@ function FindParking({
   )
 }
 
-// Parking Map component
+// Replace the ParkingMap component with this fallback version that doesn't require a Google Maps API key
+
 function ParkingMap({
   parkingLots,
   userLocation,
@@ -2091,12 +2098,25 @@ function ParkingMap({
   userLocation: { lat: number; lng: number } | null
 }) {
   const mapRef = useRef<HTMLDivElement>(null)
+  const [selectedLot, setSelectedLot] = useState<ParkingLot | null>(null)
 
-  // This is a mock map implementation
-  // In a real app, you would use a library like Google Maps, Mapbox, or Leaflet
+  // Generate random coordinates for parking lots that don't have them
+  const getCoordinates = (lot: ParkingLot) => {
+    if (lot.coordinates) return lot.coordinates
+
+    // Generate random coordinates near the user's location
+    const baseLat = userLocation?.lat || 14.5995 // Default to Philippines
+    const baseLng = userLocation?.lng || 120.9842
+
+    return {
+      lat: baseLat + (Math.random() - 0.5) * 0.05,
+      lng: baseLng + (Math.random() - 0.5) * 0.05,
+    }
+  }
+
+  // Create a simple map visualization
   useEffect(() => {
     if (mapRef.current) {
-      // Mock map initialization
       const mapContainer = mapRef.current
       mapContainer.innerHTML = ""
 
@@ -2107,36 +2127,87 @@ function ParkingMap({
       // Add user location marker
       if (userLocation) {
         const userMarker = document.createElement("div")
-        userMarker.className = "absolute w-4 h-4 bg-blue-500 rounded-full border-2 border-white"
+        userMarker.className =
+          "absolute w-6 h-6 bg-blue-500 rounded-full border-2 border-white flex items-center justify-center text-white text-xs font-bold"
         userMarker.style.left = "50%"
         userMarker.style.top = "50%"
         userMarker.style.transform = "translate(-50%, -50%)"
         userMarker.title = "Your Location"
+        userMarker.textContent = "You"
         mapElement.appendChild(userMarker)
       }
 
       // Add parking lot markers
       parkingLots.forEach((lot, index) => {
-        if (lot.coordinates) {
-          const marker = document.createElement("div")
-          marker.className = "absolute flex flex-col items-center"
-          marker.style.left = `${Math.random() * 80 + 10}%`
-          marker.style.top = `${Math.random() * 80 + 10}%`
+        const coords = getCoordinates(lot)
 
-          const pin = document.createElement("div")
-          pin.className =
-            "w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white font-bold cursor-pointer hover:bg-red-600"
-          pin.textContent = (index + 1).toString()
-          pin.title = lot.name
+        // Calculate position on the map (simplified)
+        const left = userLocation ? 50 + (coords.lng - userLocation.lng) * 1000 : Math.random() * 80 + 10
 
-          // Add click event to open directions
-          pin.addEventListener("click", () => {
-            openDirections(lot.address)
+        const top = userLocation ? 50 - (coords.lat - userLocation.lat) * 1000 : Math.random() * 80 + 10
+
+        const marker = document.createElement("div")
+        marker.className = "absolute flex flex-col items-center"
+        marker.style.left = `${Math.min(Math.max(left, 10), 90)}%`
+        marker.style.top = `${Math.min(Math.max(top, 10), 90)}%`
+
+        const pin = document.createElement("div")
+        pin.className =
+          "w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white font-bold cursor-pointer hover:bg-red-600"
+        pin.textContent = (index + 1).toString()
+        pin.title = lot.name
+
+        // Add click event to show info
+        pin.addEventListener("click", () => {
+          setSelectedLot(lot)
+
+          // Remove any existing info windows
+          const existingInfo = mapElement.querySelector(".info-window")
+          if (existingInfo) {
+            existingInfo.remove()
+          }
+
+          // Create info window
+          const infoWindow = document.createElement("div")
+          infoWindow.className = "info-window absolute bg-white p-2 rounded shadow-md z-10 w-48 text-sm"
+          infoWindow.style.left = pin.offsetLeft + "px"
+          infoWindow.style.top = pin.offsetTop - 120 + "px"
+
+          infoWindow.innerHTML = `
+            <h3 class="font-bold text-sm">${lot.name}</h3>
+            <p class="text-xs mb-1">${lot.address}</p>
+            <div class="flex items-center text-xs mb-1">
+              <span>₱${lot.price}/hour</span>
+            </div>
+            <div class="flex items-center text-xs mb-1">
+              <span>${lot.availableSpots} spots available</span>
+            </div>
+            <button class="mt-2 bg-blue-500 text-white text-xs py-1 px-2 rounded w-full">Get Directions</button>
+          `
+
+          // Add close button
+          const closeBtn = document.createElement("button")
+          closeBtn.className = "absolute top-1 right-1 text-gray-500 hover:text-gray-700"
+          closeBtn.innerHTML = "×"
+          closeBtn.addEventListener("click", () => {
+            infoWindow.remove()
+            setSelectedLot(null)
           })
+          infoWindow.appendChild(closeBtn)
 
-          marker.appendChild(pin)
-          mapElement.appendChild(marker)
-        }
+          // Add directions button functionality
+          const directionsBtn = infoWindow.querySelector("button")
+          if (directionsBtn) {
+            directionsBtn.addEventListener("click", () => {
+              openDirections(lot.address)
+            })
+          }
+
+          mapElement.appendChild(infoWindow)
+        })
+
+        marker.appendChild(pin)
+        mapElement.appendChild(marker)
       })
 
       // Add map controls
@@ -2173,7 +2244,7 @@ function ParkingMap({
 
       mapContainer.appendChild(mapElement)
     }
-  }, [parkingLots, userLocation])
+  }, [parkingLots, userLocation, selectedLot])
 
   return (
     <div className="w-full h-[500px] rounded-lg overflow-hidden border">
@@ -2191,10 +2262,22 @@ function ParkingMap({
 
 // Function to open directions in Google Maps
 function openDirections(address: string) {
-  if (typeof window !== "undefined") {
-    // Encode the address for the URL
+  if (typeof window !== "undefined" && navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const origin = `${position.coords.latitude},${position.coords.longitude}`
+        const encodedAddress = encodeURIComponent(address)
+        window.open(`https://www.google.com/maps/dir/${origin}/${encodedAddress}`, "_blank")
+      },
+      () => {
+        // If getting current position fails, just use the address
+        const encodedAddress = encodeURIComponent(address)
+        window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`, "_blank")
+      },
+    )
+  } else {
+    // Fallback if geolocation is not available
     const encodedAddress = encodeURIComponent(address)
-    // Open Google Maps in a new tab with the address
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`, "_blank")
   }
 }
@@ -2206,7 +2289,7 @@ function ParkingLotCard({
   locationPermissionGranted,
 }: {
   parkingLot: ParkingLot
-  onBooking: (booking: Omit<Booking, "id" | "driverId" | "driverEmail" | "createdAt" | "status">) => Booking
+  onBooking: (Omit<Booking, "id" | "driverId" | "driverEmail" | "createdAt" | "status">) => Booking
   locationPermissionGranted: boolean | null
 }) {
   const [isBookingOpen, setIsBookingOpen] = useState(false)
@@ -2288,7 +2371,7 @@ function BookingForm({
   onClose,
 }: {
   parkingLotId: string
-  onBooking: (booking: Omit<Booking, "id" | "driverId" | "driverEmail" | "createdAt" | "status">) => Booking
+  onBooking: (Omit<Booking, "id" | "driverId" | "driverEmail" | "createdAt" | "status">) => Booking
   onClose: () => void
 }) {
   // Format a date to YYYY-MM-DDThh:mm format for datetime-local input
@@ -2380,7 +2463,7 @@ function BookingForm({
 // Replace the RegisterParkingLotForm component with this updated version:
 function RegisterParkingLotForm({
   onRegister,
-}: { onRegister: (parkingLot: Omit<ParkingLot, "id" | "ownerId" | "createdAt">) => ParkingLot }) {
+}: { onRegister: (Omit<ParkingLot, "id" | "ownerId" | "createdAt">) => ParkingLot }) {
   const [name, setName] = useState("")
   const [address, setAddress] = useState("")
   const [spots, setSpots] = useState(10)
@@ -2671,7 +2754,7 @@ function ManageParkingLots({
   onDelete,
 }: {
   parkingLots: ParkingLot[]
-  onUpdate: (parkingLot: ParkingLot) => void
+  onUpdate: (ParkingLot) => void
   onDelete: (id: string) => void
 }) {
   return (
@@ -2700,7 +2783,7 @@ function ParkingLotManagementCard({
   onDelete,
 }: {
   parkingLot: ParkingLot
-  onUpdate: (parkingLot: ParkingLot) => void
+  onUpdate: (ParkingLot) => void
   onDelete: (id: string) => void
 }) {
   const [isEditOpen, setIsEditOpen] = useState(false)
@@ -2781,7 +2864,7 @@ function EditParkingLotForm({
   onClose,
 }: {
   parkingLot: ParkingLot
-  onUpdate: (parkingLot: ParkingLot) => void
+  onUpdate: (ParkingLot) => void
   onClose: () => void
 }) {
   const [name, setName] = useState(parkingLot.name)
