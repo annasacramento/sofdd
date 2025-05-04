@@ -941,7 +941,6 @@ function AuthPage({
         className="absolute inset-0 bg-cover bg-center"
         style={{
           backgroundImage: "url('https://i.pinimg.com/736x/0b/92/1b/0b921bd66c6ff7aa20f12b98b1e98be0.jpg')",
-          backgroundImage: "url('https://i.pinimg.com/736x/0b/92/1b/0b921bd66c6ff7aa20f12b98b1e98be0.jpg')",
         }}
       />
       <div className="absolute inset-0 bg-black/60" />
@@ -1021,7 +1020,7 @@ function AuthPage({
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="owner" id="owner" id="owner" />
+                      <RadioGroupItem value="owner" id="owner" />
                       <Label htmlFor="owner" className="cursor-pointer">
                         Parking Lot Owner (Register Parking)
                       </Label>
@@ -1687,12 +1686,11 @@ function DriverDashboard({
   setBookingToRate,
 }: {
   parkingLots: ParkingLot[]
-  bookings: Booking[]
-  onBooking: (booking: Omit<Booking, "id" | "driverId" | "driverEmail" | "createdAt" | "status">) => Booking
+  onBooking: (Omit<Booking, "id" | "driverId" | "driverEmail" | "createdAt" | "status">) => Booking
   locationPermissionGranted: boolean | null
   userLocation: { lat: number; lng: number } | null
   onSubmitRating: (bookingId: string, rating: number, comment: string) => void
-  needsRating: (booking: Booking) => boolean
+  needsRating: (bookingggg: Booking) => boolean
   showRatingDialog: boolean
   setShowRatingDialog: React.Dispatch<React.SetStateAction<boolean>>
   bookingToRate: string | null
@@ -2014,30 +2012,14 @@ function FindParking({
   userLocation,
 }: {
   parkingLots: ParkingLot[]
-  onBooking: (booking: Omit<Booking, "id" | "driverId" | "driverEmail" | "createdAt" | "status">) => Booking
+  onBooking: (Omit<Booking, "id" | "driverId" | "driverEmail" | "createdAt" | "status">) => Booking
   locationPermissionGranted: boolean | null
   userLocation: { lat: number; lng: number } | null
 }) {
-  const [mapView, setMapView] = useState(true)
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold">Available Parking Lots</h2>
-        <div className="flex gap-2">
-          <Button
-            variant={mapView ? "default" : "outline"}
-            onClick={() => setMapView(true)}
-            disabled={locationPermissionGranted === false}
-          >
-            <MapPin className="h-4 w-4 mr-2" />
-            Map View
-          </Button>
-          <Button variant={!mapView ? "default" : "outline"} onClick={() => setMapView(false)}>
-            <ParkingCircle className="h-4 w-4 mr-2" />
-            List View
-          </Button>
-        </div>
       </div>
 
       {locationPermissionGranted === false && (
@@ -2058,30 +2040,37 @@ function FindParking({
             spaces.
           </AlertDescription>
         </Alert>
-      ) : mapView ? (
-        <div>
-          {locationPermissionGranted ? (
-            <ParkingMap parkingLots={parkingLots} userLocation={userLocation} />
-          ) : (
-            <div className="bg-muted rounded-lg p-8 text-center">
-              <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-medium mb-2">Map View Disabled</h3>
-              <p className="text-muted-foreground mb-4">
-                Please enable location access to view the interactive map of parking lots.
-              </p>
-            </div>
-          )}
-        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {parkingLots.map((lot) => (
-            <ParkingLotCard
-              key={lot.id}
-              parkingLot={lot}
-              onBooking={onBooking}
-              locationPermissionGranted={locationPermissionGranted}
-            />
-          ))}
+        <div className="flex flex-col md:flex-row gap-6">
+          {/* List view on the left */}
+          <div className="md:w-1/3 space-y-4 md:max-h-[500px] md:overflow-y-auto">
+            {parkingLots.map((lot) => (
+              <ParkingLotCard
+                key={lot.id}
+                parkingLot={lot}
+                onBooking={onBooking}
+                locationPermissionGranted={locationPermissionGranted}
+                compact={true}
+              />
+            ))}
+          </div>
+
+          {/* Map view on the right */}
+          <div className="md:w-2/3">
+            {locationPermissionGranted ? (
+              <ParkingMap parkingLots={parkingLots} userLocation={userLocation} />
+            ) : (
+              <div className="bg-muted rounded-lg p-8 text-center h-[500px] flex items-center justify-center">
+                <div>
+                  <MapPin className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-medium mb-2">Map View Disabled</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Please enable location access to view the interactive map of parking lots.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -2124,6 +2113,34 @@ function ParkingMap({
       const mapElement = document.createElement("div")
       mapElement.className = "relative w-full h-full bg-blue-50 rounded-lg overflow-hidden"
 
+      // Track zoom level
+      let zoomLevel = 1
+      const minZoom = 0.5
+      const maxZoom = 2
+
+      // Function to update marker positions based on zoom
+      const updateMarkerPositions = () => {
+        try {
+          // Get all markers
+          const markers = mapElement.querySelectorAll('[data-marker="true"]')
+          markers.forEach((marker) => {
+            const baseLeft = Number.parseFloat(marker.getAttribute("data-base-left") || "50")
+            const baseTop = Number.parseFloat(marker.getAttribute("data-base-top") || "50")
+
+            // Calculate new position based on zoom level
+            const newLeft = 50 + (baseLeft - 50) * zoomLevel
+            const newTop = 50 + (baseTop - 50) * zoomLevel
+
+            // Apply new position
+            const markerElement = marker as HTMLElement
+            markerElement.style.left = `${Math.min(Math.max(newLeft, 5), 95)}%`
+            markerElement.style.top = `${Math.min(Math.max(newTop, 5), 95)}%`
+          })
+        } catch (error) {
+          console.error("Error updating marker positions:", error)
+        }
+      }
+
       // Add user location marker
       if (userLocation) {
         const userMarker = document.createElement("div")
@@ -2134,6 +2151,9 @@ function ParkingMap({
         userMarker.style.transform = "translate(-50%, -50%)"
         userMarker.title = "Your Location"
         userMarker.textContent = "You"
+        userMarker.setAttribute("data-marker", "true")
+        userMarker.setAttribute("data-base-left", "50")
+        userMarker.setAttribute("data-base-top", "50")
         mapElement.appendChild(userMarker)
       }
 
@@ -2142,14 +2162,16 @@ function ParkingMap({
         const coords = getCoordinates(lot)
 
         // Calculate position on the map (simplified)
-        const left = userLocation ? 50 + (coords.lng - userLocation.lng) * 1000 : Math.random() * 80 + 10
-
-        const top = userLocation ? 50 - (coords.lat - userLocation.lat) * 1000 : Math.random() * 80 + 10
+        const baseLeft = userLocation ? 50 + (coords.lng - userLocation.lng) * 1000 : Math.random() * 80 + 10
+        const baseTop = userLocation ? 50 - (coords.lat - userLocation.lat) * 1000 : Math.random() * 80 + 10
 
         const marker = document.createElement("div")
         marker.className = "absolute flex flex-col items-center"
-        marker.style.left = `${Math.min(Math.max(left, 10), 90)}%`
-        marker.style.top = `${Math.min(Math.max(top, 10), 90)}%`
+        marker.style.left = `${Math.min(Math.max(baseLeft, 10), 90)}%`
+        marker.style.top = `${Math.min(Math.max(baseTop, 10), 90)}%`
+        marker.setAttribute("data-marker", "true")
+        marker.setAttribute("data-base-left", baseLeft.toString())
+        marker.setAttribute("data-base-top", baseTop.toString())
 
         const pin = document.createElement("div")
         pin.className =
@@ -2174,16 +2196,16 @@ function ParkingMap({
           infoWindow.style.top = pin.offsetTop - 120 + "px"
 
           infoWindow.innerHTML = `
-            <h3 class="font-bold text-sm">${lot.name}</h3>
-            <p class="text-xs mb-1">${lot.address}</p>
-            <div class="flex items-center text-xs mb-1">
-              <span>₱${lot.price}/hour</span>
-            </div>
-            <div class="flex items-center text-xs mb-1">
-              <span>${lot.availableSpots} spots available</span>
-            </div>
-            <button class="mt-2 bg-blue-500 text-white text-xs py-1 px-2 rounded w-full">Get Directions</button>
-          `
+          <h3 class="font-bold text-sm">${lot.name}</h3>
+          <p class="text-xs mb-1">${lot.address}</p>
+          <div class="flex items-center text-xs mb-1">
+            <span>₱${lot.price}/hour</span>
+          </div>
+          <div class="flex items-center text-xs mb-1">
+            <span>${lot.availableSpots} spots available</span>
+          </div>
+          <button class="mt-2 bg-blue-500 text-white text-xs py-1 px-2 rounded w-full">Get Directions</button>
+        `
 
           // Add close button
           const closeBtn = document.createElement("button")
@@ -2217,10 +2239,22 @@ function ParkingMap({
       const zoomIn = document.createElement("button")
       zoomIn.className = "w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100"
       zoomIn.innerHTML = "+"
+      zoomIn.addEventListener("click", () => {
+        if (zoomLevel < maxZoom) {
+          zoomLevel += 0.2
+          updateMarkerPositions()
+        }
+      })
 
       const zoomOut = document.createElement("button")
       zoomOut.className = "w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100"
       zoomOut.innerHTML = "-"
+      zoomOut.addEventListener("click", () => {
+        if (zoomLevel > minZoom) {
+          zoomLevel -= 0.2
+          updateMarkerPositions()
+        }
+      })
 
       controls.appendChild(zoomIn)
       controls.appendChild(zoomOut)
@@ -2228,18 +2262,18 @@ function ParkingMap({
 
       // Add map legend
       const legend = document.createElement("div")
-      legend.className = "absolute top-4 left-4 bg-white rounded-md shadow-md p-2"
+      legend.className = "absolute bottom-4 left-4 bg-white rounded-md shadow-md p-2"
       legend.innerHTML = `
-        <div class="text-sm font-medium mb-2">Map Legend</div>
-        <div class="flex items-center gap-2 mb-1">
-          <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
-          <span class="text-xs">Your Location</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <div class="w-3 h-3 bg-red-500 rounded-full"></div>
-          <span class="text-xs">Parking Lots</span>
-        </div>
-      `
+      <div class="text-sm font-medium mb-2">Map Legend</div>
+      <div class="flex items-center gap-2 mb-1">
+        <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+        <span class="text-xs">Your Location</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+        <span class="text-xs">Parking Lots</span>
+      </div>
+    `
       mapElement.appendChild(legend)
 
       mapContainer.appendChild(mapElement)
@@ -2287,67 +2321,84 @@ function ParkingLotCard({
   parkingLot,
   onBooking,
   locationPermissionGranted,
+  compact = false,
 }: {
   parkingLot: ParkingLot
   onBooking: (Omit<Booking, "id" | "driverId" | "driverEmail" | "createdAt" | "status">) => Booking
   locationPermissionGranted: boolean | null
+  compact?: boolean
 }) {
   const [isBookingOpen, setIsBookingOpen] = useState(false)
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{parkingLot.name}</CardTitle>
-        <CardDescription>{parkingLot.address}</CardDescription>
+    <Card className={compact ? "overflow-hidden" : ""}>
+      <CardHeader className={compact ? "p-3" : ""}>
+        <CardTitle className={compact ? "text-base" : ""}>{parkingLot.name}</CardTitle>
+        <CardDescription className={compact ? "text-xs" : ""}>{parkingLot.address}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2">
-        <img
-          src={parkingLot.photos[0] || "/placeholder.svg"}
-          alt={parkingLot.name}
-          className="rounded-md aspect-video object-cover mb-2"
-        />
-        <p className="text-sm text-muted-foreground">{parkingLot.description}</p>
-        <div className="flex items-center gap-2">
-          <MapPin className="h-4 w-4" />
-          <span>{parkingLot.address}</span>
+      <CardContent className={`space-y-2 ${compact ? "p-3 pt-0" : ""}`}>
+        {/* Show image in both compact and full mode, but with different sizes */}
+        {parkingLot.photos && parkingLot.photos.length > 0 ? (
+          <img
+            src={parkingLot.photos[0] || "/placeholder.svg"}
+            alt={parkingLot.name}
+            className={`rounded-md object-cover ${compact ? "h-24 w-full" : "aspect-video mb-2"}`}
+          />
+        ) : (
+          <div className={`rounded-md bg-gray-200 ${compact ? "h-24 w-full" : "aspect-video mb-2"}`}>
+            <div className="flex h-full items-center justify-center text-gray-500">No image</div>
+          </div>
+        )}
+
+        {!compact && <p className="text-sm text-muted-foreground">{parkingLot.description}</p>}
+
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          <div className="flex items-center gap-1">
+            <Clock className={`${compact ? "h-3 w-3" : "h-4 w-4"}`} />
+            <span className={compact ? "text-xs" : ""}>₱{parkingLot.price}/hour</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <ParkingCircle className={`${compact ? "h-3 w-3" : "h-4 w-4"}`} />
+            <span className={compact ? "text-xs" : ""}>{parkingLot.availableSpots} spots</span>
+          </div>
+          {!compact && (
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4" />
+              <span>{parkingLot.contactNumber}</span>
+            </div>
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4" />
-          <span>₱{parkingLot.price}/hour</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <ParkingCircle className="h-4 w-4" />
-          <span>{parkingLot.availableSpots} spots available</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Phone className="h-4 w-4" />
-          <span>{parkingLot.contactNumber}</span>
-        </div>
+
         {parkingLot.averageRating ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <div className="flex">
               {[1, 2, 3, 4, 5].map((star) => (
                 <Star
                   key={star}
-                  className={`h-4 w-4 ${
+                  className={`${compact ? "h-3 w-3" : "h-4 w-4"} ${
                     star <= Math.round(parkingLot.averageRating!) ? "text-yellow-500 fill-yellow-500" : "text-gray-300"
                   }`}
                 />
               ))}
             </div>
-            <span className="text-sm text-muted-foreground">{parkingLot.averageRating.toFixed(1)} stars</span>
+            <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>
+              {parkingLot.averageRating.toFixed(1)}
+            </span>
           </div>
         ) : null}
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button onClick={() => setIsBookingOpen(true)}>Book Now</Button>
+      <CardFooter className={`flex justify-between ${compact ? "p-3 pt-0" : ""}`}>
+        <Button size={compact ? "sm" : "default"} onClick={() => setIsBookingOpen(true)}>
+          Book Now
+        </Button>
         <Button
           variant="outline"
+          size={compact ? "sm" : "default"}
           onClick={() => openDirections(parkingLot.address)}
           disabled={locationPermissionGranted === false}
         >
-          <Navigation className="h-4 w-4 mr-2" />
-          Get Directions
+          <Navigation className={`${compact ? "h-3 w-3" : "h-4 w-4"} mr-1`} />
+          Directions
         </Button>
       </CardFooter>
 
@@ -2499,17 +2550,18 @@ function RegisterParkingLotForm({
     !photoError
 
   const handleVehicleTypeChange = (vehicleType: string) => {
-    const newSelectedTypes = (prev) =>
-      prev.includes(vehicleType) ? prev.filter((v) => v !== vehicleType) : [...prev, vehicleType]
+    setSelectedVehicleTypes((prev) =>
+      prev.includes(vehicleType) ? prev.filter((v) => v !== vehicleType) : [...prev, vehicleType],
+    )
 
-    setSelectedVehicleTypes(newSelectedTypes)
-
-    // Validate vehicle types
-    if (newSelectedTypes.length === 0) {
-      setVehicleTypesError("Please select at least one vehicle type")
-    } else {
-      setVehicleTypesError("")
-    }
+    // Update validation after state change
+    setTimeout(() => {
+      if (selectedVehicleTypes.length === 0) {
+        setVehicleTypesError("Please select at least one vehicle type")
+      } else {
+        setVehicleTypesError("")
+      }
+    }, 0)
   }
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
